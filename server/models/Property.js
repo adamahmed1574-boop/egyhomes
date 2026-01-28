@@ -3,19 +3,32 @@ const mongoose = require('mongoose');
 const PropertySchema = new mongoose.Schema({
   title: { type: String, required: true },
   price: { type: Number, required: true },
-  location: { type: String, required: true },
+  location: { type: String, required: true }, // The City
+  governorate: { type: String, required: true }, // The Governorate
   area: { type: Number, required: true },
   description: String,
+  
+  // Media
   images: { type: [String], required: true },
+  videoUrl: { type: String },
+  mapUrl: { type: String },
+  
+  // Details
   type: { type: String, default: 'Apartment' },
-  bedrooms: { type: Number, required: true },
-  bathrooms: { type: Number, required: true },
+  listingType: { type: String, default: 'Buy' }, // Buy or Rent
+  bedrooms: { type: Number },
+  bathrooms: { type: Number },
   level: { type: Number },
+  
+  // Status
   isSold: { type: Boolean, default: false },
-  // New Features
-  videoUrl: { type: String },       // Feature #2 (YouTube)
-  mapUrl: { type: String },         // Feature #8 (Google Maps)
-  isFeatured: { type: Boolean, default: false }, // Feature #6 (Featured Badge)
+  isFeatured: { type: Boolean, default: false },
+  isHotDeal: { type: Boolean, default: false },
+  
+  // Mortgage Config (List of allowed years, e.g. [1, 3, 5, 10])
+  mortgagePlans: { type: [Number], default: [5, 10] }, 
+  
+  views: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 

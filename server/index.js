@@ -4,7 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const Property = require('./models/Property');
-const Partner = require('./models/Partner'); // Import new model
+const Partner = require('./models/Partner');
 
 const app = express();
 app.use(cors());
@@ -14,32 +14,42 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected!'))
   .catch(err => console.log(err));
 
-// --- 1. PROPERTIES ROUTES ---
+// --- PROPERTY ROUTES ---
 
-// GET ALL
-// GET ALL (With Search Filters)
+// GET ALL (With Filters)
 app.get('/api/properties', async (req, res) => {
   try {
-    const { type, minPrice, maxPrice, location } = req.query;
+    const { type, listingType, minPrice, maxPrice, location, governorate, isHotDeal } = req.query;
     
-    // Build Query
     let query = {};
     if (type && type !== 'All') query.type = type;
-    if (location) query.location = { $regex: location, $options: 'i' }; // Partial match
+    if (listingType && listingType !== 'All') query.listingType = listingType;
+    if (governorate && governorate !== 'All') query.governorate = governorate;
+    if (location && location !== 'All') query.location = location; // City
+    if (isHotDeal === 'true') query.isHotDeal = true;
+    
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    const properties = await Property.find(query).sort({ isFeatured: -1, createdAt: -1 }); // Featured first
+    const properties = await Property.find(query).sort({ isFeatured: -1, createdAt: -1 });
     res.json(properties);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ADD NEW (Secure)
+// GET ONE
+app.get('/api/properties/:id', async (req, res) => {
+    try {
+        const prop = await Property.findById(req.params.id);
+        res.json(prop);
+    } catch (err) { res.status(404).json({error: "Not Found"}); }
+});
+
+// ADD NEW
 app.post('/api/properties', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -49,7 +59,7 @@ app.post('/api/properties', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// EDIT PROPERTY (Secure) - NEW!
+// EDIT
 app.put('/api/properties/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -58,7 +68,7 @@ app.put('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE (Secure)
+// DELETE
 app.delete('/api/properties/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -67,24 +77,18 @@ app.delete('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// INCREMENT VIEW COUNT (Public) - NEW!
+// INCREMENT VIEW
 app.post('/api/properties/:id/view', async (req, res) => {
-    try {
-        await Property.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
-        res.json({ message: "View counted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    await Property.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
+    res.json({ message: "Viewed" });
 });
 
-
-// --- 2. PARTNERS ROUTES (Verified Companies) ---
-
-// GET PARTNERS
+// --- PARTNER ROUTES ---
 app.get('/api/partners', async (req, res) => {
     const partners = await Partner.find();
     res.json(partners);
 });
 
-// ADD PARTNER (Secure)
 app.post('/api/partners', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     const newPartner = new Partner(req.body);
@@ -92,7 +96,6 @@ app.post('/api/partners', async (req, res) => {
     res.json(newPartner);
 });
 
-// DELETE PARTNER (Secure)
 app.delete('/api/partners/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     await Partner.findByIdAndDelete(req.params.id);
