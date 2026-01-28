@@ -17,11 +17,26 @@ mongoose.connect(process.env.MONGO_URI)
 // --- 1. PROPERTIES ROUTES ---
 
 // GET ALL
+// GET ALL (With Search Filters)
 app.get('/api/properties', async (req, res) => {
-    try {
-        const properties = await Property.find().sort({ createdAt: -1 }); // Newest first
-        res.json(properties);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const { type, minPrice, maxPrice, location } = req.query;
+    
+    // Build Query
+    let query = {};
+    if (type && type !== 'All') query.type = type;
+    if (location) query.location = { $regex: location, $options: 'i' }; // Partial match
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    const properties = await Property.find(query).sort({ isFeatured: -1, createdAt: -1 }); // Featured first
+    res.json(properties);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ADD NEW (Secure)

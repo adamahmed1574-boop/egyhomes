@@ -27,7 +27,7 @@ export default function About() {
         <div className="bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
           <h2 className="text-2xl font-bold mb-6 text-blue-900">Who We Are</h2>
           <p className="text-lg leading-relaxed text-slate-600 mb-6">
-            <span className="font-bold text-slate-900">Egy Homes</span> is a modern real estate startup founded in 2025 by two driven 16-year-old entrepreneurs. 
+            <span className="font-bold text-slate-900">Egy Homes</span> is a modern real estate startup founded in 2025 by two driven entrepreneurs. 
             Our mission is to simplify and accelerate property transactions through targeted online marketing and advanced technology.
           </p>
           <p className="text-lg leading-relaxed text-slate-600 mb-8">

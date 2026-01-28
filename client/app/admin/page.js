@@ -3,202 +3,374 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminPanel() {
-  const router = useRouter();
+  // --- 1. State Variables (تعريف المتغيرات) ---
   const [secret, setSecret] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // Data
+  // Data State
   const [properties, setProperties] = useState([]);
-  const [partners, setPartners] = useState([]);
-  
-  // New Partner Form
-  const [newPartnerName, setNewPartnerName] = useState('');
-  const [newPartnerLogo, setNewPartnerLogo] = useState('');
+  const [partners, setPartners] = useState([]); 
 
-  // Editing State
-  const [editingId, setEditingId] = useState(null); // ID of property being edited
-  const [editForm, setEditForm] = useState({}); // Data for edit
+  // Property Form State
+  const [form, setForm] = useState({
+    title: '',
+    price: '',
+    location: '',
+    area: '',
+    description: '',
+    images: '',
+    type: 'Apartment',
+    bedrooms: '',
+    bathrooms: '',
+    level: '',
+    isSold: false,
+    videoUrl: '',    // Feature: YouTube
+    mapUrl: '',      // Feature: Google Maps
+    isFeatured: false // Feature: Featured Badge
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Partner Form State
+  const [partnerForm, setPartnerForm] = useState({
+    name: '',
+    logo: ''
+  });
 
-  const fetchData = () => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties`).then(res => res.json()).then(setProperties);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners`).then(res => res.json()).then(setPartners);
+  const [editingId, setEditingId] = useState(null);
+  const router = useRouter();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  // --- 2. Functions (الوظائف) ---
+
+  // Check Password
+  const checkLogin = () => {
+    if (secret === process.env.NEXT_PUBLIC_ADMIN_SECRET) {
+      setIsAuthenticated(true);
+      fetchData();
+    } else {
+      alert('Wrong Password!');
+    }
   };
 
-  // --- PARTNER FUNCTIONS ---
-  const addPartner = async () => {
-    if (!secret) return alert("Enter Admin Password first!");
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newPartnerName, logo: newPartnerLogo, secret })
-    });
-    if (res.ok) {
-      setNewPartnerName(''); setNewPartnerLogo('');
-      fetchData(); // Refresh list
-    } else { alert("Failed. Check Password."); }
+  // Fetch All Data (Properties + Partners)
+  const fetchData = async () => {
+    try {
+      // Get Properties
+      const resProp = await fetch(`${API_URL}/api/properties`);
+      const dataProp = await resProp.json();
+      setProperties(dataProp);
+
+      // Get Partners
+      const resPart = await fetch(`${API_URL}/api/partners`);
+      const dataPart = await resPart.json();
+      setPartners(dataPart);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
   };
 
-  const deletePartner = async (id) => {
-    if(!window.confirm("Delete Partner?")) return;
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret })
-    });
-    fetchData();
+  // Handle Property Submit (Add or Edit)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Convert text images to array
+    const imagesArray = form.images
+      .split(/[\n,]+/)
+      .map(url => url.trim())
+      .filter(url => url !== '');
+
+    const payload = { ...form, images: imagesArray, secret };
+
+    const url = editingId 
+      ? `${API_URL}/api/properties/${editingId}` 
+      : `${API_URL}/api/properties`;
+      
+    const method = editingId ? 'PUT' : 'POST';
+
+    try {
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      // Reset Form
+      setForm({
+        title: '', price: '', location: '', area: '', description: '', 
+        images: '', type: 'Apartment', bedrooms: '', bathrooms: '', level: '', 
+        isSold: false, videoUrl: '', mapUrl: '', isFeatured: false
+      });
+      setEditingId(null);
+      fetchData();
+      alert(editingId ? "Property Updated!" : "Property Added!");
+    } catch (error) {
+      alert("Error saving property");
+    }
   };
 
-  // --- PROPERTY FUNCTIONS ---
+  // Delete Property
   const deleteProperty = async (id) => {
-    if(!window.confirm("Delete Property?")) return;
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${id}`, {
+    if (!confirm("Are you sure you want to delete this property?")) return;
+    
+    await fetch(`${API_URL}/api/properties/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret })
     });
+    
     fetchData();
   };
 
-  const toggleSold = async (property) => {
-    if (!secret) return alert("Enter Admin Password first!");
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${property._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...property, isSold: !property.isSold, secret })
-    });
-    fetchData();
-  };
-
+  // Start Editing Mode
   const startEdit = (property) => {
     setEditingId(property._id);
-    setEditForm(property);
-  };
-
-  const saveEdit = async () => {
-    if (!secret) return alert("Enter Admin Password first!");
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${editingId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...editForm, secret })
+    setForm({ 
+      ...property, 
+      images: property.images ? property.images.join('\n') : '' 
     });
-    setEditingId(null);
-    fetchData();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-8 font-sans">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">Admin Command Center 2.0</h1>
-          <button onClick={() => router.push('/add')} className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700">
-            + List New Property
+  // Delete Partner
+  const deletePartner = async (id) => {
+      if(!confirm("Delete Partner?")) return;
+      
+      await fetch(`${API_URL}/api/partners/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+      });
+      
+      fetchData();
+  };
+
+  // Add Partner
+  const handlePartnerSubmit = async (e) => {
+      e.preventDefault();
+      
+      await fetch(`${API_URL}/api/partners`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...partnerForm, secret })
+      });
+      
+      setPartnerForm({ name: '', logo: '' });
+      fetchData();
+  };
+
+  // --- 3. Login Screen Render ---
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
+        <div className="p-8 bg-white rounded shadow-md w-96">
+          <h2 className="text-2xl mb-6 font-bold text-center text-blue-900">Admin Login</h2>
+          <input 
+            type="password" 
+            placeholder="Enter Secret Code" 
+            className="border p-3 w-full mb-6 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => setSecret(e.target.value)}
+          />
+          <button 
+            onClick={checkLogin} 
+            className="bg-blue-900 text-white w-full py-3 rounded font-bold hover:bg-blue-800 transition"
+          >
+            Access Dashboard
           </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* PASSWORD BAR */}
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-red-100 flex items-center gap-4">
-          <label className="font-bold text-red-600">🔑 Admin Password:</label>
-          <input 
-            type="password" value={secret} onChange={e => setSecret(e.target.value)}
-            className="border p-2 rounded w-64 text-black" placeholder="Enter strictly..."
-          />
-        </div>
+  // --- 4. Main Dashboard Render ---
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-blue-900 border-b pb-4">
+          Admin Dashboard
+        </h1>
 
-        {/* --- PARTNERS MANAGER --- */}
-        <div className="mb-12 bg-white p-6 rounded-xl shadow-sm border border-blue-100">
-          <h2 className="text-xl font-bold mb-4 text-slate-700">Manage Verified Partners</h2>
-          <div className="flex gap-4 mb-4">
-            <input 
-              placeholder="Partner Name (e.g. Palm Hills)" 
-              value={newPartnerName} onChange={e => setNewPartnerName(e.target.value)}
-              className="border p-2 rounded text-black"
-            />
-            <input 
-              placeholder="Logo URL" 
-              value={newPartnerLogo} onChange={e => setNewPartnerLogo(e.target.value)}
-              className="border p-2 rounded w-64 text-black"
-            />
-            <button onClick={addPartner} className="bg-green-600 text-white px-4 rounded font-bold">Add</button>
-          </div>
+        {/* --- SECTION 1: PROPERTY FORM --- */}
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-12">
+          <h2 className="text-xl font-bold mb-6 text-gray-800">
+            {editingId ? '✏️ Edit Property' : '➕ Add New Property'}
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Basic Details */}
+            <div className="space-y-4">
+               <input required placeholder="Title (e.g. Luxury Appt)" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="border p-3 rounded w-full" />
+               <input required type="number" placeholder="Price (EGP)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="border p-3 rounded w-full" />
+               <input required placeholder="Location (e.g. New Cairo)" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="border p-3 rounded w-full" />
+               <input required type="number" placeholder="Area (m2)" value={form.area} onChange={e => setForm({...form, area: e.target.value})} className="border p-3 rounded w-full" />
+            </div>
 
-          <div className="flex flex-wrap gap-4">
-            {partners.map(p => (
-              <div key={p._id} className="flex items-center gap-2 bg-slate-100 p-2 rounded border">
-                <img src={p.logo} className="w-8 h-8 object-contain" />
-                <span className="font-bold text-sm text-slate-700">{p.name}</span>
-                <button onClick={() => deletePartner(p._id)} className="text-red-500 font-bold hover:text-red-700">×</button>
-              </div>
-            ))}
-          </div>
-        </div>
+            {/* Advanced Details */}
+            <div className="space-y-4">
+               <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="border p-3 rounded w-full bg-white">
+                  <option value="Apartment">Apartment</option>
+                  <option value="Villa">Villa</option>
+                  <option value="Duplex">Duplex</option>
+                  <option value="Commercial">Commercial</option>
+               </select>
+               
+               <div className="grid grid-cols-3 gap-2">
+                  <input type="number" placeholder="Beds" value={form.bedrooms} onChange={e => setForm({...form, bedrooms: e.target.value})} className="border p-3 rounded" />
+                  <input type="number" placeholder="Baths" value={form.bathrooms} onChange={e => setForm({...form, bathrooms: e.target.value})} className="border p-3 rounded" />
+                  <input type="number" placeholder="Level" value={form.level} onChange={e => setForm({...form, level: e.target.value})} className="border p-3 rounded" />
+               </div>
 
-        {/* --- PROPERTIES LIST --- */}
-        <h2 className="text-xl font-bold mb-4 text-slate-700">Property Management</h2>
-        <div className="grid gap-4">
-          {properties.map((property) => (
-            <div key={property._id} className={`bg-white p-4 rounded-xl shadow-sm border flex flex-col md:flex-row items-center gap-6 ${property.isSold ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}>
-              
-              {/* IMAGE & STATUS */}
-              <div className="relative w-24 h-24 flex-shrink-0">
-                <img src={property.images[0] || property.image} className="w-full h-full object-cover rounded" />
-                {property.isSold && <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center text-white font-bold text-xs">SOLD</div>}
-              </div>
+               {/* New Features: Video & Map */}
+               <input placeholder="YouTube Video URL (Optional)" value={form.videoUrl} onChange={e => setForm({...form, videoUrl: e.target.value})} className="border p-3 rounded w-full" />
+               <input placeholder="Google Maps Link (Optional)" value={form.mapUrl} onChange={e => setForm({...form, mapUrl: e.target.value})} className="border p-3 rounded w-full" />
+            </div>
+            
+            {/* Featured Checkbox */}
+            <div className="md:col-span-2 bg-yellow-50 p-4 rounded border border-yellow-200 flex items-center gap-3">
+                <input 
+                  type="checkbox" 
+                  id="featured"
+                  checked={form.isFeatured} 
+                  onChange={e => setForm({...form, isFeatured: e.target.checked})} 
+                  className="w-5 h-5 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded" 
+                />
+                <label htmlFor="featured" className="font-bold text-yellow-800 cursor-pointer">
+                  Mark this property as FEATURED (Display star badge & show first)
+                </label>
+            </div>
 
-              {/* INFO OR EDIT FORM */}
-              <div className="flex-grow">
-                {editingId === property._id ? (
-                  // EDIT MODE
-                  <div className="grid gap-2">
-                    <input className="border p-1 rounded text-black" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} />
-                    <input className="border p-1 rounded text-black" type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: e.target.value})} />
-                    <div className="flex gap-2">
-                      <button onClick={saveEdit} className="bg-green-500 text-white px-3 py-1 rounded text-sm">Save</button>
-                      <button onClick={() => setEditingId(null)} className="bg-gray-400 text-white px-3 py-1 rounded text-sm">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  // VIEW MODE
-                  <>
-                    <h3 className="font-bold text-lg text-slate-800">{property.title}</h3>
-                    <p className="text-green-600 font-bold">{property.price.toLocaleString()} EGP</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span>👁️ {property.views} Views</span>
-                      <span>🆔 {property._id}</span>
-                    </div>
-                  </>
-                )}
-              </div>
+            {/* Images Area */}
+            <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Property Images (One URL per line)</label>
+                <textarea 
+                    required 
+                    rows="5"
+                    placeholder="https://image1.jpg&#10;https://image2.jpg" 
+                    value={form.images} 
+                    onChange={e => setForm({...form, images: e.target.value})} 
+                    className="border p-3 rounded w-full font-mono text-sm" 
+                />
+            </div>
 
-              {/* ACTIONS */}
-              <div className="flex flex-col gap-2 min-w-[140px]">
-                <button 
-                  onClick={() => toggleSold(property)}
-                  className={`px-4 py-1 rounded font-bold text-sm ${property.isSold ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}
-                >
-                  {property.isSold ? 'Mark Available' : 'Mark as Sold'}
+            {/* Description Area */}
+            <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Description</label>
+                <textarea 
+                    placeholder="Describe the property details..." 
+                    rows="4" 
+                    value={form.description} 
+                    onChange={e => setForm({...form, description: e.target.value})} 
+                    className="border p-3 rounded w-full" 
+                />
+            </div>
+
+            {/* Buttons */}
+            <div className="md:col-span-2 flex gap-4">
+                <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded font-bold hover:bg-green-700 transition shadow-md">
+                  {editingId ? 'Update Property' : 'List Property Now'}
                 </button>
                 
-                <button 
-                  onClick={() => startEdit(property)}
-                  className="bg-blue-100 text-blue-600 px-4 py-1 rounded font-bold text-sm hover:bg-blue-200"
-                >
-                  Edit Details
-                </button>
+                {editingId && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                        setEditingId(null); 
+                        setForm({
+                            title: '', price: '', location: '', area: '', description: '', 
+                            images: '', type: 'Apartment', bedrooms: '', bathrooms: '', level: '', 
+                            isSold: false, videoUrl: '', mapUrl: '', isFeatured: false
+                        });
+                    }} 
+                    className="bg-gray-500 text-white px-8 py-3 rounded font-bold hover:bg-gray-600 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
+            </div>
+          </form>
+        </div>
 
+        {/* --- SECTION 2: PROPERTIES LIST --- */}
+        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-t pt-8">
+            Manage Properties ({properties.length})
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+          {properties.map(property => (
+            <div key={property._id} className="bg-white p-4 rounded-lg shadow-sm border hover:shadow-md transition relative">
+              
+              {/* Badges */}
+              <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                 {property.isSold && <span className="bg-red-600 text-white text-xs px-2 py-1 rounded shadow">SOLD</span>}
+                 {property.isFeatured && <span className="bg-yellow-400 text-black text-xs px-2 py-1 rounded shadow font-bold">★ FEATURED</span>}
+              </div>
+
+              {/* Image */}
+              <img 
+                src={property.images && property.images.length > 0 ? property.images[0] : ''} 
+                alt={property.title} 
+                className="w-full h-48 object-cover rounded mb-4 bg-gray-100" 
+              />
+              
+              {/* Info */}
+              <h3 className="font-bold text-lg mb-1 truncate">{property.title}</h3>
+              <p className="text-blue-900 font-bold text-xl mb-2">{parseInt(property.price).toLocaleString()} EGP</p>
+              <p className="text-gray-500 text-sm mb-4">📍 {property.location}</p>
+              
+              {/* Actions */}
+              <div className="flex justify-between border-t pt-4 mt-2">
                 <button 
-                  onClick={() => deleteProperty(property._id)}
-                  className="bg-red-100 text-red-600 px-4 py-1 rounded font-bold text-sm hover:bg-red-200"
+                    onClick={() => startEdit(property)} 
+                    className="text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded transition"
                 >
-                  Delete
+                    Edit
+                </button>
+                <button 
+                    onClick={() => deleteProperty(property._id)} 
+                    className="text-red-600 font-bold hover:bg-red-50 px-4 py-2 rounded transition"
+                >
+                    Delete
                 </button>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* --- SECTION 3: PARTNERS --- */}
+        <div className="bg-white p-8 rounded-xl shadow-lg border-t-4 border-purple-600">
+             <h2 className="text-xl font-bold mb-6 text-gray-800">Manage Partners</h2>
+             
+             <form onSubmit={handlePartnerSubmit} className="flex flex-col md:flex-row gap-4 mb-8">
+                 <input 
+                    placeholder="Partner Name" 
+                    value={partnerForm.name} 
+                    onChange={e => setPartnerForm({...partnerForm, name: e.target.value})} 
+                    className="border p-3 rounded flex-1"
+                 />
+                 <input 
+                    placeholder="Logo URL" 
+                    value={partnerForm.logo} 
+                    onChange={e => setPartnerForm({...partnerForm, logo: e.target.value})} 
+                    className="border p-3 rounded flex-1"
+                 />
+                 <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded font-bold hover:bg-purple-700 transition shadow">
+                    Add Partner
+                 </button>
+             </form>
+
+             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                 {partners.map(p => (
+                     <div key={p._id} className="text-center border p-4 rounded-lg relative group hover:shadow-lg transition bg-gray-50">
+                         <img src={p.logo} className="h-16 mx-auto mb-3 object-contain"/>
+                         <p className="font-bold text-sm text-gray-700">{p.name}</p>
+                         <button 
+                            onClick={() => deletePartner(p._id)} 
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold opacity-0 group-hover:opacity-100 transition shadow"
+                         >
+                            ✕
+                         </button>
+                     </div>
+                 ))}
+             </div>
         </div>
 
       </div>
