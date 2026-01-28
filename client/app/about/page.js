@@ -6,7 +6,7 @@ export default function About() {
 
   useEffect(() => {
     // Fetch partners from the database
-    fetch('http://localhost:5001/api/partners')
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners`)
       .then(res => res.json())
       .then(setPartners)
       .catch(err => console.log(err));

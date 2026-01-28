@@ -23,14 +23,14 @@ export default function AdminPanel() {
   }, []);
 
   const fetchData = () => {
-    fetch('http://localhost:5001/api/properties').then(res => res.json()).then(setProperties);
-    fetch('http://localhost:5001/api/partners').then(res => res.json()).then(setPartners);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties`).then(res => res.json()).then(setProperties);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners`).then(res => res.json()).then(setPartners);
   };
 
   // --- PARTNER FUNCTIONS ---
   const addPartner = async () => {
     if (!secret) return alert("Enter Admin Password first!");
-    const res = await fetch('http://localhost:5001/api/partners', {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newPartnerName, logo: newPartnerLogo, secret })
@@ -43,7 +43,7 @@ export default function AdminPanel() {
 
   const deletePartner = async (id) => {
     if(!window.confirm("Delete Partner?")) return;
-    await fetch(`http://localhost:5001/api/partners/${id}`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret })
@@ -54,7 +54,7 @@ export default function AdminPanel() {
   // --- PROPERTY FUNCTIONS ---
   const deleteProperty = async (id) => {
     if(!window.confirm("Delete Property?")) return;
-    await fetch(`http://localhost:5001/api/properties/${id}`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret })
@@ -64,7 +64,7 @@ export default function AdminPanel() {
 
   const toggleSold = async (property) => {
     if (!secret) return alert("Enter Admin Password first!");
-    await fetch(`http://localhost:5001/api/properties/${property._id}`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${property._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...property, isSold: !property.isSold, secret })
@@ -79,7 +79,7 @@ export default function AdminPanel() {
 
   const saveEdit = async () => {
     if (!secret) return alert("Enter Admin Password first!");
-    await fetch(`http://localhost:5001/api/properties/${editingId}`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/properties/${editingId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...editForm, secret })
