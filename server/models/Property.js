@@ -13,7 +13,7 @@ const PropertySchema = new mongoose.Schema({
   // Specs
   area: { type: Number, required: true },
   type: { type: String, default: 'Apartment' },
-  listingType: { type: String, default: 'Buy' }, // 'Buy' or 'Rent'
+  listingType: { type: String, default: 'Buy' }, // Buy or Rent
   bedrooms: { type: Number },
   bathrooms: { type: Number },
   level: { type: Number },

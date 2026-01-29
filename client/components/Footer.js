@@ -20,7 +20,6 @@ export default function Footer() {
                 <Link href="/" className="hover:text-emerald-400 transition">Home</Link>
                 <Link href="/search" className="hover:text-emerald-400 transition">Browse Properties</Link>
                 <Link href="/about" className="hover:text-emerald-400 transition">About Us</Link>
-                <Link href="/search?show=favorites" className="hover:text-emerald-400 transition">My Favorites</Link>
             </div>
         </div>
 
@@ -46,7 +45,6 @@ export default function Footer() {
                 </div>
             </div>
         </div>
-
       </div>
       <div className="text-center mt-12 pt-8 border-t border-slate-800 text-slate-600 text-xs">
         © 2026 EgyHomes. All rights reserved.
