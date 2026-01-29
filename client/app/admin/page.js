@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { GOVERNORATES, CITIES } from '../../database/locations';
+import { GOVERNORATES, CITIES } from '../../data/locations';
 
 export default function AdminPanel() {
   const [secret, setSecret] = useState('');
@@ -9,17 +9,16 @@ export default function AdminPanel() {
   const [partners, setPartners] = useState([]);
   const [editingId, setEditingId] = useState(null);
   
-  // Form State
   const [form, setForm] = useState({
     title: '', price: '', description: '', images: '',
-    governorate: '1', city: 'New Cairo', 
+    governorate: '1', city: '', // Location
     type: 'Apartment', listingType: 'Buy', 
     bedrooms: '', bathrooms: '', level: '', area: '',
     videoUrl: '', mapUrl: '', 
     isSold: false, isFeatured: false, isHotDeal: false,
     mortgageMonths: '12, 60, 120', 
-    interestRate: '20',
-    maxMortgagePercent: '80' // Default Max Financing
+    interestRate: '25',
+    maxMortgagePercent: '80'
   });
 
   const [partnerForm, setPartnerForm] = useState({ name: '', logo: '' });
@@ -38,11 +37,13 @@ export default function AdminPanel() {
     try {
         const resProp = await fetch(`${API_URL}/api/properties`);
         const dataProp = await resProp.json();
-        setProperties(dataProp);
+        // Check if data is array to prevent map errors
+        if (Array.isArray(dataProp)) setProperties(dataProp);
+        else console.error("Properties API error:", dataProp);
 
         const resPart = await fetch(`${API_URL}/api/partners`);
         const dataPart = await resPart.json();
-        setPartners(dataPart);
+        if (Array.isArray(dataPart)) setPartners(dataPart);
     } catch (err) {
         console.error(err);
     }
@@ -54,9 +55,13 @@ export default function AdminPanel() {
     const mortgageArray = form.mortgageMonths.toString().split(',').map(m => Number(m.trim()));
     const govName = GOVERNORATES[form.governorate] || form.governorate;
 
+    // Use selected city or default to first city in list if empty
+    const cityName = form.city || (CITIES[form.governorate] ? CITIES[form.governorate][0] : '');
+
     const payload = { 
         ...form, 
         governorate: govName, 
+        city: cityName,
         images: imagesArray, 
         mortgagePlans: mortgageArray,
         interestRate: Number(form.interestRate),
@@ -68,19 +73,23 @@ export default function AdminPanel() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
-        await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        setForm({
-            title: '', price: '', description: '', images: '',
-            governorate: '1', city: 'New Cairo', type: 'Apartment', listingType: 'Buy',
-            bedrooms: '', bathrooms: '', level: '', area: '',
-            videoUrl: '', mapUrl: '', isSold: false, isFeatured: false, isHotDeal: false,
-            mortgageMonths: '12, 60, 120', interestRate: '20', maxMortgagePercent: '80'
-        });
-        setEditingId(null);
-        fetchData();
-        alert("Success!");
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if(res.ok) {
+            setForm({
+                title: '', price: '', description: '', images: '',
+                governorate: '1', city: '', type: 'Apartment', listingType: 'Buy',
+                bedrooms: '', bathrooms: '', level: '', area: '',
+                videoUrl: '', mapUrl: '', isSold: false, isFeatured: false, isHotDeal: false,
+                mortgageMonths: '12, 60, 120', interestRate: '25', maxMortgagePercent: '80'
+            });
+            setEditingId(null);
+            fetchData();
+            alert("Success!");
+        } else {
+            alert("Failed to save. Check inputs.");
+        }
     } catch (err) {
-        alert("Error saving property");
+        alert("Server Error");
     }
   };
 
@@ -93,13 +102,16 @@ export default function AdminPanel() {
 
   const startEdit = (p) => {
       setEditingId(p._id);
+      // Reverse lookup gov ID
       const govId = Object.keys(GOVERNORATES).find(key => GOVERNORATES[key] === p.governorate) || '1';
+      
       setForm({
           ...p,
           governorate: govId,
+          city: p.city,
           images: p.images.join('\n'),
           mortgageMonths: p.mortgagePlans ? p.mortgagePlans.join(', ') : '12, 60',
-          interestRate: p.interestRate || '20',
+          interestRate: p.interestRate || '25',
           maxMortgagePercent: p.maxMortgagePercent || '80'
       });
       window.scrollTo(0,0);
@@ -138,17 +150,17 @@ export default function AdminPanel() {
             <input placeholder="Title" value={form.title} onChange={e=>setForm({...form, title: e.target.value})} className="border p-3 rounded-xl" required />
             <input type="number" placeholder="Price (EGP)" value={form.price} onChange={e=>setForm({...form, price: e.target.value})} className="border p-3 rounded-xl" required />
             
-            {/* Locations */}
+            {/* Location Dropdowns */}
             <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-500 ml-1">Governorate</label>
-                <select value={form.governorate} onChange={e=>setForm({...form, governorate: e.target.value, city: CITIES[GOVERNORATES[e.target.value]]?.[0] || ''})} className="border p-3 rounded-xl w-full">
+                <select value={form.governorate} onChange={e=>setForm({...form, governorate: e.target.value, city: CITIES[e.target.value]?.[0] || ''})} className="border p-3 rounded-xl w-full">
                     {Object.entries(GOVERNORATES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-500 ml-1">City</label>
                 <select value={form.city} onChange={e=>setForm({...form, city: e.target.value})} className="border p-3 rounded-xl w-full">
-                    {CITIES[GOVERNORATES[form.governorate]]?.map(c => <option key={c} value={c}>{c}</option>)}
+                    {CITIES[form.governorate]?.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
             </div>
 
@@ -206,7 +218,7 @@ export default function AdminPanel() {
             {properties.map(p => (
                 <div key={p._id} className="flex flex-col md:flex-row justify-between items-center border p-4 rounded-xl hover:shadow-md transition bg-gray-50">
                     <div className="flex items-center gap-4 mb-4 md:mb-0 w-full">
-                        <img src={p.images[0]} className="w-16 h-16 rounded object-cover"/>
+                        <img src={p.images && p.images.length > 0 ? p.images[0] : ''} className="w-16 h-16 rounded object-cover"/>
                         <div>
                             <span className="font-bold text-lg block">{p.title}</span>
                             <span className="text-sm text-gray-500">{parseInt(p.price).toLocaleString()} EGP - {p.city}</span>

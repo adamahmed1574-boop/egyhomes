@@ -15,8 +15,6 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.log(err));
 
 // --- PROPERTY ROUTES ---
-
-// GET ALL (With Filters)
 app.get('/api/properties', async (req, res) => {
   try {
     const { type, listingType, minPrice, maxPrice, location, governorate, isHotDeal } = req.query;
@@ -25,7 +23,7 @@ app.get('/api/properties', async (req, res) => {
     if (type && type !== 'All') query.type = type;
     if (listingType && listingType !== 'All') query.listingType = listingType;
     if (governorate && governorate !== 'All') query.governorate = governorate;
-    if (location && location !== 'All') query.location = location; // City
+    if (location && location !== 'All') query.city = location; 
     if (isHotDeal === 'true') query.isHotDeal = true;
     
     if (minPrice || maxPrice) {
@@ -41,7 +39,6 @@ app.get('/api/properties', async (req, res) => {
   }
 });
 
-// GET ONE
 app.get('/api/properties/:id', async (req, res) => {
     try {
         const prop = await Property.findById(req.params.id);
@@ -49,7 +46,6 @@ app.get('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(404).json({error: "Not Found"}); }
 });
 
-// ADD NEW
 app.post('/api/properties', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -59,7 +55,6 @@ app.post('/api/properties', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// EDIT
 app.put('/api/properties/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -68,7 +63,6 @@ app.put('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE
 app.delete('/api/properties/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -77,7 +71,6 @@ app.delete('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// INCREMENT VIEW
 app.post('/api/properties/:id/view', async (req, res) => {
     await Property.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
     res.json({ message: "Viewed" });
