@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { GOVERNORATES, CITIES } from '../../data/locations';
+import { GOVERNORATES, CITIES } from '../../database/locations';
 
 function SearchContent() {
   const searchParams = useSearchParams();
