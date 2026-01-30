@@ -11,11 +11,14 @@ export default function AdminPanel() {
   
   const [form, setForm] = useState({
     title: '', price: '', description: '', images: '',
-    governorate: '1', city: '', type: 'Apartment', listingType: 'Buy', 
+    governorate: '1', city: '', 
+    type: 'Apartment', listingType: 'Buy', 
     bedrooms: '', bathrooms: '', level: '', area: '',
     videoUrl: '', mapUrl: '', 
     isSold: false, isFeatured: false, isHotDeal: false,
-    mortgageMonths: '12, 60, 120', interestRate: '20', maxMortgagePercent: '80'
+    mortgageMonths: '12, 60, 120', 
+    interestRate: '20',
+    maxMortgagePercent: '80'
   });
 
   const [partnerForm, setPartnerForm] = useState({ name: '', logo: '' });
@@ -25,35 +28,71 @@ export default function AdminPanel() {
     if (secret === process.env.NEXT_PUBLIC_ADMIN_SECRET) {
       setIsAuthenticated(true);
       fetchData();
-    } else { alert('Wrong Password!'); }
+    } else {
+      alert('Wrong Password!');
+    }
   };
 
   const fetchData = async () => {
     try {
         const resProp = await fetch(`${API_URL}/api/properties`);
-        setProperties(await resProp.json());
+        const dataProp = await resProp.json();
+        // Check if data is array to prevent map errors
+        if (Array.isArray(dataProp)) setProperties(dataProp);
+        else console.error("Properties API error:", dataProp);
+
         const resPart = await fetch(`${API_URL}/api/partners`);
-        setPartners(await resPart.json());
-    } catch (err) { console.error(err); }
+        const dataPart = await resPart.json();
+        if (Array.isArray(dataPart)) setPartners(dataPart);
+    } catch (err) {
+        console.error(err);
+        setProperties([]);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const imagesArray = form.images.split(/[\n,]+/).map(u => u.trim()).filter(u => u);
     const mortgageArray = form.mortgageMonths.toString().split(',').map(m => Number(m.trim()));
+    
+    // Save Governorate NAME (not ID)
     const govName = GOVERNORATES[form.governorate] || form.governorate;
+    // Default to first city if none selected
     const cityName = form.city || (CITIES[form.governorate] ? CITIES[form.governorate][0] : form.city);
 
-    const payload = { ...form, governorate: govName, city: cityName, images: imagesArray, mortgagePlans: mortgageArray, interestRate: Number(form.interestRate), maxMortgagePercent: Number(form.maxMortgagePercent), secret };
+    const payload = { 
+        ...form, 
+        governorate: govName, 
+        city: cityName,
+        images: imagesArray, 
+        mortgagePlans: mortgageArray,
+        interestRate: Number(form.interestRate),
+        maxMortgagePercent: Number(form.maxMortgagePercent),
+        secret 
+    };
+
     const url = editingId ? `${API_URL}/api/properties/${editingId}` : `${API_URL}/api/properties`;
     const method = editingId ? 'PUT' : 'POST';
 
     try {
-        await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        setEditingId(null);
-        fetchData();
-        alert("Success!");
-    } catch (err) { alert("Error saving"); }
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if(res.ok) {
+             setForm({
+                title: '', price: '', description: '', images: '',
+                governorate: '1', city: '', type: 'Apartment', listingType: 'Buy',
+                bedrooms: '', bathrooms: '', level: '', area: '',
+                videoUrl: '', mapUrl: '', isSold: false, isFeatured: false, isHotDeal: false,
+                mortgageMonths: '12, 60, 120', interestRate: '20', maxMortgagePercent: '80'
+            });
+            setEditingId(null);
+            fetchData();
+            alert("Success!");
+        } else {
+            alert("Failed. Check password.");
+        }
+    } catch (err) {
+        alert("Server Error");
+    }
   };
 
   const deleteProperty = async (id) => {
@@ -65,8 +104,18 @@ export default function AdminPanel() {
 
   const startEdit = (p) => {
       setEditingId(p._id);
+      // Reverse lookup gov ID
       const govId = Object.keys(GOVERNORATES).find(key => GOVERNORATES[key] === p.governorate) || '1';
-      setForm({ ...p, governorate: govId, city: p.city, images: p.images.join('\n'), mortgageMonths: p.mortgagePlans ? p.mortgagePlans.join(', ') : '12, 60', interestRate: p.interestRate || '20', maxMortgagePercent: p.maxMortgagePercent || '80' });
+      
+      setForm({
+          ...p,
+          governorate: govId,
+          city: p.city,
+          images: p.images.join('\n'),
+          mortgageMonths: p.mortgagePlans ? p.mortgagePlans.join(', ') : '12, 60',
+          interestRate: p.interestRate || '20',
+          maxMortgagePercent: p.maxMortgagePercent || '80'
+      });
       window.scrollTo(0,0);
   };
 
@@ -84,7 +133,7 @@ export default function AdminPanel() {
       }
   };
 
-  if (!isAuthenticated) return <div className="h-screen flex items-center justify-center bg-gray-100"><div className="p-8 bg-white rounded shadow-md"><input type="password" onChange={e=>setSecret(e.target.value)} className="p-3 border rounded w-full mb-4" placeholder="Secret Code"/> <button onClick={checkLogin} className="bg-blue-900 text-white w-full p-3 rounded font-bold">Login</button></div></div>;
+  if (!isAuthenticated) return <div className="h-screen flex items-center justify-center bg-gray-100"><div className="p-8 bg-white rounded shadow-md"><h2 className="text-2xl font-bold mb-4 text-blue-900">Admin Login</h2><input type="password" onChange={e=>setSecret(e.target.value)} className="p-3 border rounded w-full mb-4" placeholder="Secret Code"/> <button onClick={checkLogin} className="bg-blue-900 text-white w-full p-3 rounded font-bold">Login</button></div></div>;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
@@ -92,9 +141,9 @@ export default function AdminPanel() {
         <h1 className="text-3xl font-bold mb-8 text-blue-900 border-b pb-4">Admin Dashboard</h1>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
             <div className="md:col-span-2 flex flex-wrap gap-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-700"><input type="checkbox" checked={form.isFeatured} onChange={e=>setForm({...form, isFeatured: e.target.checked})} className="w-5 h-5"/> Featured</label>
-                <label className="flex items-center gap-2 cursor-pointer text-red-600 font-bold"><input type="checkbox" checked={form.isHotDeal} onChange={e=>setForm({...form, isHotDeal: e.target.checked})} className="w-5 h-5"/> Hot Deal</label>
-                <label className="flex items-center gap-2 cursor-pointer text-gray-500 font-bold"><input type="checkbox" checked={form.isSold} onChange={e=>setForm({...form, isSold: e.target.checked})} className="w-5 h-5"/> Sold Out</label>
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-700"><input type="checkbox" checked={form.isFeatured} onChange={e=>setForm({...form, isFeatured: e.target.checked})} className="w-5 h-5"/> ★ Featured</label>
+                <label className="flex items-center gap-2 cursor-pointer text-red-600 font-bold"><input type="checkbox" checked={form.isHotDeal} onChange={e=>setForm({...form, isHotDeal: e.target.checked})} className="w-5 h-5"/> 🔥 Hot Deal</label>
+                <label className="flex items-center gap-2 cursor-pointer text-gray-500 font-bold"><input type="checkbox" checked={form.isSold} onChange={e=>setForm({...form, isSold: e.target.checked})} className="w-5 h-5"/> 🚫 Sold Out</label>
             </div>
             <input placeholder="Title" value={form.title} onChange={e=>setForm({...form, title: e.target.value})} className="border p-3 rounded-xl" required />
             <input type="number" placeholder="Price (EGP)" value={form.price} onChange={e=>setForm({...form, price: e.target.value})} className="border p-3 rounded-xl" required />
@@ -136,6 +185,11 @@ export default function AdminPanel() {
                     <div className="flex gap-2 w-full md:w-auto"><button onClick={() => startEdit(p)} className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg font-bold flex-1">Edit</button><button onClick={() => deleteProperty(p._id)} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold flex-1">Delete</button></div>
                 </div>
             ))}
+        </div>
+        <div className="mt-16 pt-8 border-t-2 border-gray-100">
+             <h2 className="text-2xl font-bold mb-6 text-gray-800">Partners</h2>
+             <form onSubmit={addPartner} className="flex gap-4 mb-6"><input placeholder="Partner Name" value={partnerForm.name} onChange={e => setPartnerForm({...partnerForm, name: e.target.value})} className="border p-3 rounded-xl flex-1"/><input placeholder="Logo URL" value={partnerForm.logo} onChange={e => setPartnerForm({...partnerForm, logo: e.target.value})} className="border p-3 rounded-xl flex-1"/><button className="bg-purple-600 text-white px-6 rounded-xl font-bold">Add</button></form>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{partners.map(p => (<div key={p._id} className="border p-4 rounded-xl flex justify-between items-center bg-white"><span className="font-bold">{p.name}</span><button onClick={() => deletePartner(p._id)} className="text-red-500 font-bold">✕</button></div>))}</div>
         </div>
       </div>
     </div>
