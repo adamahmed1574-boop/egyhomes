@@ -37,16 +37,13 @@ export default function AdminPanel() {
     try {
         const resProp = await fetch(`${API_URL}/api/properties`);
         const dataProp = await resProp.json();
-        // Check if data is array to prevent map errors
-        if (Array.isArray(dataProp)) setProperties(dataProp);
-        else console.error("Properties API error:", dataProp);
+        setProperties(Array.isArray(dataProp) ? dataProp : []);
 
         const resPart = await fetch(`${API_URL}/api/partners`);
         const dataPart = await resPart.json();
-        if (Array.isArray(dataPart)) setPartners(dataPart);
+        setPartners(Array.isArray(dataPart) ? dataPart : []);
     } catch (err) {
-        console.error(err);
-        setProperties([]);
+        console.error("Fetch Error:", err);
     }
   };
 
@@ -55,11 +52,16 @@ export default function AdminPanel() {
     const imagesArray = form.images.split(/[\n,]+/).map(u => u.trim()).filter(u => u);
     const mortgageArray = form.mortgageMonths.toString().split(',').map(m => Number(m.trim()));
     
-    // Save Governorate NAME (not ID)
+    // Get Gov Name
     const govName = GOVERNORATES[form.governorate] || form.governorate;
-    // Default to first city if none selected
-    const cityName = form.city || (CITIES[form.governorate] ? CITIES[form.governorate][0] : form.city);
+    
+    // Get City Name (If empty, default to first city of selected gov)
+    let cityName = form.city;
+    if (!cityName && CITIES[govName]) {
+        cityName = CITIES[govName][0];
+    }
 
+    // CRITICAL FIX: Ensure 'secret' is inside the payload
     const payload = { 
         ...form, 
         governorate: govName, 
@@ -68,7 +70,7 @@ export default function AdminPanel() {
         mortgagePlans: mortgageArray,
         interestRate: Number(form.interestRate),
         maxMortgagePercent: Number(form.maxMortgagePercent),
-        secret 
+        secret: secret // <--- THIS IS KEY
     };
 
     const url = editingId ? `${API_URL}/api/properties/${editingId}` : `${API_URL}/api/properties`;
@@ -88,23 +90,34 @@ export default function AdminPanel() {
             fetchData();
             alert("Success!");
         } else {
-            alert("Failed. Check password.");
+            const errData = await res.json();
+            alert("Failed: " + (errData.error || "Unknown Error"));
         }
     } catch (err) {
-        alert("Server Error");
+        alert("Server Connection Error");
     }
   };
 
   const deleteProperty = async (id) => {
     if(confirm("Delete?")) {
-        await fetch(`${API_URL}/api/properties/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret }) });
-        fetchData();
+        // CRITICAL FIX: Send secret in body
+        const res = await fetch(`${API_URL}/api/properties/${id}`, { 
+            method: 'DELETE', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ secret }) 
+        });
+        
+        if (res.ok) {
+            fetchData();
+        } else {
+            alert("Failed to delete. Check password.");
+        }
     }
   };
 
   const startEdit = (p) => {
       setEditingId(p._id);
-      // Reverse lookup gov ID
+      // Reverse lookup gov ID so dropdown works
       const govId = Object.keys(GOVERNORATES).find(key => GOVERNORATES[key] === p.governorate) || '1';
       
       setForm({
@@ -139,26 +152,33 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
       <div className="max-w-5xl mx-auto bg-white p-8 rounded-3xl shadow-xl">
         <h1 className="text-3xl font-bold mb-8 text-blue-900 border-b pb-4">Admin Dashboard</h1>
+        
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+            
             <div className="md:col-span-2 flex flex-wrap gap-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-700"><input type="checkbox" checked={form.isFeatured} onChange={e=>setForm({...form, isFeatured: e.target.checked})} className="w-5 h-5"/> ★ Featured</label>
                 <label className="flex items-center gap-2 cursor-pointer text-red-600 font-bold"><input type="checkbox" checked={form.isHotDeal} onChange={e=>setForm({...form, isHotDeal: e.target.checked})} className="w-5 h-5"/> 🔥 Hot Deal</label>
                 <label className="flex items-center gap-2 cursor-pointer text-gray-500 font-bold"><input type="checkbox" checked={form.isSold} onChange={e=>setForm({...form, isSold: e.target.checked})} className="w-5 h-5"/> 🚫 Sold Out</label>
             </div>
+
             <input placeholder="Title" value={form.title} onChange={e=>setForm({...form, title: e.target.value})} className="border p-3 rounded-xl" required />
             <input type="number" placeholder="Price (EGP)" value={form.price} onChange={e=>setForm({...form, price: e.target.value})} className="border p-3 rounded-xl" required />
+            
+            {/* Location Dropdowns - Fixed Logic */}
             <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-500 ml-1">Governorate</label>
-                <select value={form.governorate} onChange={e=>setForm({...form, governorate: e.target.value, city: CITIES[e.target.value]?.[0] || ''})} className="border p-3 rounded-xl w-full">
+                <select value={form.governorate} onChange={e=>setForm({...form, governorate: e.target.value, city: ''})} className="border p-3 rounded-xl w-full">
                     {Object.entries(GOVERNORATES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-500 ml-1">City</label>
                 <select value={form.city} onChange={e=>setForm({...form, city: e.target.value})} className="border p-3 rounded-xl w-full">
-                    {CITIES[form.governorate]?.map(c => <option key={c} value={c}>{c}</option>)}
+                    {/* Get Gov Name from ID, then get Cities List */}
+                    {CITIES[GOVERNORATES[form.governorate]]?.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
             </div>
+
             <select value={form.listingType} onChange={e=>setForm({...form, listingType: e.target.value})} className="border p-3 rounded-xl bg-blue-50 font-bold text-blue-800"><option value="Buy">For Sale</option><option value="Rent">For Rent</option></select>
             <select value={form.type} onChange={e=>setForm({...form, type: e.target.value})} className="border p-3 rounded-xl"><option value="Apartment">Apartment</option><option value="Villa">Villa</option><option value="Duplex">Duplex</option><option value="Commercial">Commercial</option><option value="Chalet">Chalet</option></select>
             <input type="number" placeholder="Area (m2)" value={form.area} onChange={e=>setForm({...form, area: e.target.value})} className="border p-3 rounded-xl" />
@@ -167,16 +187,23 @@ export default function AdminPanel() {
                 <input type="number" placeholder="Baths" value={form.bathrooms} onChange={e=>setForm({...form, bathrooms: e.target.value})} className="border p-3 rounded-xl" />
                 <input type="number" placeholder="Level" value={form.level} onChange={e=>setForm({...form, level: e.target.value})} className="border p-3 rounded-xl" />
             </div>
+            
+            <input placeholder="YouTube URL" value={form.videoUrl} onChange={e=>setForm({...form, videoUrl: e.target.value})} className="border p-3 rounded-xl" />
+            <input placeholder="Google Map URL" value={form.mapUrl} onChange={e=>setForm({...form, mapUrl: e.target.value})} className="border p-3 rounded-xl" />
+            
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
                 <div><label className="text-xs font-bold text-gray-500 ml-1">Interest (%)</label><input type="number" value={form.interestRate} onChange={e=>setForm({...form, interestRate: e.target.value})} className="border p-3 rounded-xl w-full" /></div>
                 <div><label className="text-xs font-bold text-gray-500 ml-1">Max Financing (%)</label><input type="number" value={form.maxMortgagePercent} onChange={e=>setForm({...form, maxMortgagePercent: e.target.value})} className="border p-3 rounded-xl w-full" /></div>
                 <div><label className="text-xs font-bold text-gray-500 ml-1">Plans (Months)</label><input value={form.mortgageMonths} onChange={e=>setForm({...form, mortgageMonths: e.target.value})} className="border p-3 rounded-xl w-full" /></div>
             </div>
+            
             <textarea placeholder="Description" rows="3" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} className="border p-3 rounded-xl md:col-span-2" />
             <textarea placeholder="Image URLs (One per line)" rows="5" value={form.images} onChange={e=>setForm({...form, images: e.target.value})} className="border p-3 rounded-xl md:col-span-2 font-mono text-sm bg-gray-50" required />
+
             <button type="submit" className="bg-emerald-600 text-white p-4 rounded-xl font-bold md:col-span-2 hover:bg-emerald-700 transition shadow-lg">{editingId ? 'Update Property' : 'Save New Property'}</button>
             {editingId && <button type="button" onClick={() => setEditingId(null)} className="bg-gray-500 text-white p-3 rounded-xl md:col-span-2 font-bold">Cancel Edit</button>}
         </form>
+
         <div className="mt-12 grid gap-4">
             <h2 className="text-2xl font-bold text-gray-800">Your Properties</h2>
             {properties.map(p => (
@@ -186,6 +213,7 @@ export default function AdminPanel() {
                 </div>
             ))}
         </div>
+
         <div className="mt-16 pt-8 border-t-2 border-gray-100">
              <h2 className="text-2xl font-bold mb-6 text-gray-800">Partners</h2>
              <form onSubmit={addPartner} className="flex gap-4 mb-6"><input placeholder="Partner Name" value={partnerForm.name} onChange={e => setPartnerForm({...partnerForm, name: e.target.value})} className="border p-3 rounded-xl flex-1"/><input placeholder="Logo URL" value={partnerForm.logo} onChange={e => setPartnerForm({...partnerForm, logo: e.target.value})} className="border p-3 rounded-xl flex-1"/><button className="bg-purple-600 text-white px-6 rounded-xl font-bold">Add</button></form>
