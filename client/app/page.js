@@ -11,14 +11,12 @@ export default function Home() {
     fetch(`${API_URL}/api/properties?isHotDeal=true`) 
       .then((res) => res.json())
       .then((data) => {
-        // SAFETY: Check if array
         const list = Array.isArray(data) ? data : [];
         setProperties(list.slice(0, 6)); 
         setLoading(false);
       })
       .catch((err) => {
-        console.error(err);
-        setProperties([]); // Safety
+        setProperties([]); 
         setLoading(false);
       });
   }, [API_URL]);

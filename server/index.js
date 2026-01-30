@@ -7,19 +7,16 @@ const Property = require('./models/Property');
 const Partner = require('./models/Partner');
 
 const app = express();
-
-// Enable CORS for ALL origins (Fixes connection error)
+// ALLOW ALL CONNECTIONS
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 
-// Database Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected!'))
   .catch(err => console.log("DB Error:", err));
 
 // --- ROUTES ---
 
-// GET Properties
 app.get('/api/properties', async (req, res) => {
   try {
     const { type, listingType, minPrice, maxPrice, location, governorate, isHotDeal } = req.query;
@@ -41,11 +38,10 @@ app.get('/api/properties', async (req, res) => {
     res.json(properties);
   } catch (err) {
     console.error(err);
-    res.json([]); // Return empty array instead of crashing
+    res.json([]); // Return empty list instead of crashing
   }
 });
 
-// GET One Property
 app.get('/api/properties/:id', async (req, res) => {
     try {
         const prop = await Property.findById(req.params.id);
@@ -54,12 +50,8 @@ app.get('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Server Error" }); }
 });
 
-// ADD Property
 app.post('/api/properties', async (req, res) => {
-    // Check Password
-    if (req.body.secret !== process.env.ADMIN_SECRET) {
-        return res.status(403).json({ error: "Wrong Password! Check Vercel Settings." });
-    }
+    if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
         const newProperty = new Property(req.body);
         const saved = await newProperty.save();
@@ -67,16 +59,6 @@ app.post('/api/properties', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE Property
-app.delete('/api/properties/:id', async (req, res) => {
-    if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
-    try {
-        await Property.findByIdAndDelete(req.params.id);
-        res.json({ message: "Deleted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// EDIT Property
 app.put('/api/properties/:id', async (req, res) => {
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
@@ -85,13 +67,20 @@ app.put('/api/properties/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// VIEW Count
+app.delete('/api/properties/:id', async (req, res) => {
+    // Check password from Body
+    if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
+    try {
+        await Property.findByIdAndDelete(req.params.id);
+        res.json({ message: "Deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/properties/:id/view', async (req, res) => {
     await Property.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
     res.json({ message: "Viewed" });
 });
 
-// --- PARTNERS ---
 app.get('/api/partners', async (req, res) => {
     try {
         const partners = await Partner.find();
@@ -113,4 +102,4 @@ app.delete('/api/partners/:id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
