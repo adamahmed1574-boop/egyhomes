@@ -7,8 +7,8 @@ const Property = require('./models/Property');
 const Partner = require('./models/Partner');
 
 const app = express();
-// ALLOW ALL CONNECTIONS
-app.use(cors({ origin: '*', credentials: true }));
+// ALLOW ALL CORS requests (Fixes Connection Error)
+app.use(cors());
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI)
@@ -17,6 +17,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // --- ROUTES ---
 
+// GET Properties
 app.get('/api/properties', async (req, res) => {
   try {
     const { type, listingType, minPrice, maxPrice, location, governorate, isHotDeal } = req.query;
@@ -68,7 +69,6 @@ app.put('/api/properties/:id', async (req, res) => {
 });
 
 app.delete('/api/properties/:id', async (req, res) => {
-    // Check password from Body
     if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Wrong Password" });
     try {
         await Property.findByIdAndDelete(req.params.id);
@@ -102,4 +102,4 @@ app.delete('/api/partners/:id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
